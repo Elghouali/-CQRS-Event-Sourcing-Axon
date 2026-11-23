@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:tp4test;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  h2:
+    console:
+      enabled: false
+axon:
+  serializer:
+    general: jackson
+    events: jackson
+    messages: jackson
+  axonserver:
+    enabled: false
+  eventhandling:
+    processors:
+      account-projection:
+        mode: subscribing
