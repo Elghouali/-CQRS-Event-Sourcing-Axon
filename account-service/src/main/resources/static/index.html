@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TP4 • Axon CQRS / Event Sourcing</title>
+<style>
+  :root { color-scheme: dark; --bg:#0a1020; --card:#151d32; --line:#273451; --text:#eef3ff; --muted:#aab5d0; --accent:#66dfb3; }
+  * { box-sizing:border-box } body { margin:0;background:radial-gradient(circle at top left,#223050,var(--bg) 50%);font:15px/1.6 system-ui,-apple-system,Segoe UI,sans-serif;color:var(--text); }
+  main{max-width:1100px;margin:0 auto;padding:36px 18px 70px}h1{font-size:clamp(27px,4vw,39px);line-height:1.16;margin:8px 0 12px}h2{font-size:17px;margin:0 0 18px}p{color:var(--muted)}.tag{color:var(--accent);font-weight:750;letter-spacing:2px;font-size:11px;text-transform:uppercase}
+  .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.card{border:1px solid var(--line);border-radius:17px;background:var(--card);padding:24px;box-shadow:0 18px 50px #0002}.wide{grid-column:1/-1}
+  label{display:block;color:var(--muted);font-size:12px;margin:10px 0 4px}input,select{width:100%;background:#0b1326;color:var(--text);border:1px solid #3a4863;border-radius:9px;padding:11px;font:inherit;outline:none}
+  input:focus,select:focus{border-color:var(--accent)}button{border:0;border-radius:9px;background:var(--accent);color:#09231c;font-weight:750;padding:11px 15px;cursor:pointer;margin-top:13px}button.secondary{background:#344260;color:var(--text)}button:disabled{opacity:.5;cursor:not-allowed}.actions{display:flex;gap:9px;flex-wrap:wrap}.info{background:#0a1427;border:1px solid #32445d;border-radius:12px;padding:14px;overflow-wrap:anywhere;white-space:pre-wrap}pre{max-height:350px;overflow:auto;background:#0b1324;border-radius:11px;padding:15px;border:1px solid #2e3a55;font-size:12px;white-space:pre-wrap}
+  .status{display:inline-block;padding:4px 9px;border-radius:20px;background:#23463b;color:#9bf5cd;font-size:12px;font-weight:bold}.hint{font-size:12px}.value{font-size:34px;font-weight:750;letter-spacing:-1px;margin:6px 0}
+  @media(max-width:700px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}.card{padding:18px}}
+</style></head>
+<body><main>
+<div class="tag">ENSET · Systèmes distribués et DevOps</div>
+<h1>Banking CQRS <span style="color:var(--accent)">&</span> Event Sourcing</h1>
+<p>Mini-laboratoire Axon Framework : commandes, agrégat, événements persistants et projections de lecture.</p>
+<div class="grid">
+  <section class="card"><h2>1. Créer un compte</h2><label for="initial">Solde initial</label><input id="initial" type="number" value="1000" min="0" step="0.01"><label for="currency">Devise</label><input id="currency" value="MAD" maxlength="3"><button onclick="create()">Créer le compte</button></section>
+  <section class="card"><h2>2. Sélectionner un compte</h2><label for="accountId">Identifiant (UUID)</label><input id="accountId" placeholder="Créer un compte pour remplir ce champ"><div class="actions"><button class="secondary" onclick="refresh()">Actualiser</button><button class="secondary" onclick="listAccounts()">Lister tous</button></div><div id="summary" class="hint" style="margin-top:15px">Aucun compte sélectionné</div></section>
+  <section class="card"><h2>3. Commandes (Write Model)</h2><label for="amount">Montant</label><input id="amount" type="number" value="500" min="0.01" step="0.01"><div class="actions"><button onclick="postAction('credit')">Créditer</button><button onclick="postAction('debit')">Débiter</button></div><label for="status">Statut</label><select id="status"><option>ACTIVE</option><option>SUSPENDED</option><option>CLOSED</option></select><button class="secondary" onclick="changeStatus()">Mettre à jour le statut</button></section>
+  <section class="card"><h2>4. Historique (Event Store)</h2><div class="status">Append-only</div><pre id="history">Créez puis sélectionnez un compte.</pre></section>
+  <section class="card wide"><h2>Résultat API</h2><div class="info" id="output">Prêt. Utilisez les actions ci-dessus.</div><p class="hint">Cette page utilise le service sur le port 8081. Les mêmes API sont disponibles par la passerelle Spring Cloud au port 8080.</p></section>
+</div>
+</main><script>
+const api='/api/accounts';const id=()=>document.getElementById('accountId').value.trim();
+const show=(data)=>{document.getElementById('output').textContent=typeof data==='string'?data:JSON.stringify(data,null,2)};
+async function request(path,method='GET',payload){
+ try{const response=await fetch(api+path,{method,headers:{'Content-Type':'application/json'},body:payload===undefined?undefined:JSON.stringify(payload)});
+ const data=await response.json();if(!response.ok)throw new Error(`${response.status} ${data.message||response.statusText}`);show(data);return data;}
+ catch(err){show('Erreur : '+err.message);return null;}
+}
+async function create(){const data=await request('','POST',{initialBalance:Number(document.getElementById('initial').value),currency:document.getElementById('currency').value});if(data?.accountId){document.getElementById('accountId').value=data.accountId;await refresh();}}
+async function postAction(type){if(!id())return show('Sélectionnez un compte');const data=await request('/'+encodeURIComponent(id())+'/'+type,'POST',{amount:Number(document.getElementById('amount').value)});if(data)await refresh();}
+async function changeStatus(){if(!id())return show('Sélectionnez un compte');const data=await request('/'+encodeURIComponent(id())+'/status','PATCH',{status:document.getElementById('status').value});if(data)await refresh();}
+async function refresh(){if(!id())return show('Sélectionnez un compte');const a=await request('/'+encodeURIComponent(id()));if(a){document.getElementById('summary').innerHTML='<strong>'+a.balance+' '+a.currency+'</strong> · '+a.status;const events=await request('/'+encodeURIComponent(id())+'/events');if(events)document.getElementById('history').textContent=JSON.stringify(events,null,2);}}
+async function listAccounts(){const accounts=await request('');if(accounts?.length){document.getElementById('accountId').value=accounts[0].accountId;await refresh();}}
+</script></body></html>

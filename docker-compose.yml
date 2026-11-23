@@ -1,0 +1,23 @@
+services:
+  account-service:
+    build:
+      context: .
+      dockerfile: account-service/Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      DB_URL: "jdbc:h2:file:/app/data/accounts-db;DB_CLOSE_ON_EXIT=FALSE"
+    volumes:
+      - tp4-h2-data:/app/data
+  gateway-service:
+    build:
+      context: .
+      dockerfile: gateway-service/Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - account-service
+    environment:
+      ACCOUNT_SERVICE_URL: "http://account-service:8081"
+volumes:
+  tp4-h2-data:
