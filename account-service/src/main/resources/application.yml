@@ -1,0 +1,31 @@
+server:
+  port: 8081
+spring:
+  application:
+    name: account-service
+  datasource:
+    url: ${DB_URL:jdbc:h2:file:./data/accounts-db;DB_CLOSE_ON_EXIT=FALSE}
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  h2:
+    console:
+      enabled: true # development only; do not expose H2 console in production
+axon:
+  serializer:
+    general: jackson
+    events: jackson
+    messages: jackson
+  axonserver:
+    enabled: false
+  eventhandling:
+    processors:
+      account-projection:
+        mode: subscribing
+logging:
+  level:
+    ma.enset.tp4: INFO
